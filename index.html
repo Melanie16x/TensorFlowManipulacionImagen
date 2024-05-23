@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manipulación de Imágenes con TensorFlow.js</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <style>
+        img, canvas {
+            max-width: 100%;
+            height: auto;
+        }
+        .image-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .image-container div {
+            flex: 1;
+            min-width: 300px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Manipulación de Imágenes con TensorFlow.js</h1>
+    <input type="file" id="imageUpload" accept="image/*">
+    <div class="image-container">
+        <div>
+            <h2>Imagen Original</h2>
+            <img id="originalImage" alt="Imagen Original">
+        </div>
+        <div>
+            <h2>Imagen Recortada</h2>
+            <canvas id="croppedImage" alt="Imagen Recortada"></canvas>
+        </div>
+        <div>
+            <h2>Redimensionada (Método 1)</h2>
+            <canvas id="resizedImage1" alt="Imagen Redimensionada 1"></canvas>
+        </div>
+        <div>
+            <h2>Redimensionada (Método 2)</h2>
+            <canvas id="resizedImage2" alt="Imagen Redimensionada 2"></canvas>
+        </div>
+        <div>
+            <h2>Redimensionada y Espejada</h2>
+            <canvas id="flippedImage" alt="Imagen Espejada"></canvas>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('imageUpload').addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            const img = document.getElementById('originalImage');
+            img.src = URL.createObjectURL(file);
+
+            img.onload = async () => {
+                const imageTensor = tf.browser.fromPixels(img);
+
+                // Recortar la imagen (ejemplo: recortar el centro)
+                const cropSize = [200, 200];
+                const croppedTensor = tf.image.cropAndResize(imageTensor.expandDims(0), [[0.25, 0.25, 0.75, 0.75]], [0], cropSize);
+                await drawTensorOnCanvas(croppedTensor.squeeze(), document.getElementById('croppedImage'));
+
+                // Cambiar el tamaño de la imagen usando dos métodos diferentes
+                // Método 1: tf.image.resizeBilinear
+                const resizedTensor1 = tf.image.resizeBilinear(imageTensor, [300, 300]);
+                await drawTensorOnCanvas(resizedTensor1, document.getElementById('resizedImage1'));
+
+                // Método 2: tf.image.resizeWithCropOrPad
+                const resizedTensor2 = tf.image.resizeWithCropOrPad(imageTensor, 300, 300);
+                await drawTensorOnCanvas(resizedTensor2, document.getElementById('resizedImage2'));
+
+                // Espejar una de las imágenes redimensionadas (usando la primera)
+                const flippedTensor = tf.image.flipLeftRight(resizedTensor1);
+                await drawTensorOnCanvas(flippedTensor, document.getElementById('flippedImage'));
+            };
+        });
+
+        async function drawTensorOnCanvas(tensor, canvas) {
+            const [height, width] = tensor.shape;
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            const imageData = new ImageData(width, height);
+            const data = await tensor.data();
+            for (let i = 0; i < data.length; i += 3) {
+                const j = (i / 3) * 4;
+                imageData.data[j] = data[i];
+                imageData.data[j + 1] = data[i + 1];
+                imageData.data[j + 2] = data[i + 2];
+                imageData.data[j + 3] = 255; // Alpha channel
+            }
+            ctx.putImageData(imageData, 0, 0);
+        }
+    </script>
+</body>
+</html>
